@@ -49,7 +49,7 @@ It might make sense to version all backups.
 git init
 
 # don't use the `--global` option, we want to store it locally in `.git/config`
-git configuser.email <email>
+git config user.email <email>
 git config user.name <name>
 git config commit.gpgsign true
 
@@ -79,6 +79,11 @@ wget -O $GNUPGHOME/gpg.conf https://raw.githubusercontent.com/drduh/config/maste
 ```
 
 or copy existing one from backup drive to avoid early network connections.
+
+> [!IMPORTANT]
+> In the current version of DrDuh's config, the `armor` option is set, i.e. gpg
+> exports are not in binary format anymore by default. Keep in mind to add the
+> `--no-armor` flag when needed.
 
 ## Generating
 
@@ -142,14 +147,15 @@ gpg --export $KEYID | hokey lint
 
 ## Exporting
 
-Create export folder
+Create export folder (or directly use folder on backup drive)
 
 ```bash
 mkdir $GNUPGHOME/exports
 ```
 
 > [!NOTE]
-> Exported files will always differ because of salting, see [here](https://bbs.archlinux.org/viewtopic.php?id=263337).
+> Exports of the same key will always produce different files because of
+> salting, see [here](https://bbs.archlinux.org/viewtopic.php?id=263337).
 
 All secret keys incl. subkeys
 
@@ -176,11 +182,12 @@ gpg --import-options restore[,keep-ownertrust] --import full_backup.asc
 ```
 
 Paperkey and QR code (examples [here](https://wiki.archlinux.org/title/Paperkey))
+can optionally be generated from binary secret keys
 
 ```bash
 sudo pacman -S paperkey qrencode
-gpg --export-secret-key $KEYID | paperkey --output paperkey.asc
-gpg --export-secret-key $KEYID | paperkey --output-type raw | qrencode --8bit --level H --output paperkey.qr.png
+gpg --no-armor --export-secret-keys $KEYID | paperkey --output paperkey.asc
+gpg --no-armor --export-secret-keys $KEYID | paperkey --output-type raw | qrencode --8bit --level H --output paperkey.qr.png
 ```
 
 Print paperkey (make sure to set a default printer in CUPS)
@@ -194,11 +201,11 @@ binary versions
 
 ```
 gpg --armor --export $KEYID > pubkey.asc
-gpg --export $KEYID > pubkey.gpg
+gpg --no-armor --export $KEYID > pubkey.gpg
 ```
 
 Revocation certificate (with optionally specified reason) in case key gets
-compromised
+compromised (-> select 1)
 
 > [!NOTE]
 > By default a generic one is already created in `$GNUPGHOME/openpgp-revocs.d/$KEYID.rev`.
@@ -243,11 +250,16 @@ gpg --keyserver hkps://keyserver.ubuntu.com --send-keys $KEYID
 gpg --keyserver https://pgp.mit.edu --send-keys $KEYID
 ```
 
+> [!TIP]
+> Now is a good time to test recovery of the generated backup exports,
+> in particular for the paperkey version. Just create another temporary
+> GNUPGHOME and run the import commands listed below.
+
 ## Recovery
 
 Process
 
-1. requires _binary_ pubkey in addition (dearmor if required)
+1. requires _binary_ pubkey in addition (de-armor if required)
 2. needs `export GPG_TTY=$(tty)` for `gpg --import` on live system
 
 From QR code
@@ -266,7 +278,7 @@ Optionally use some OCR software like
 [OCRmyPDF / tesseract](https://github.com/ocrmypdf/OCRmyPDF) to convert printed sheets into
 `paperkey.asc` file.
 
-## Extending
+## Extending Expiration
 
 > [!IMPORTANT]
 > The expiration date is a public key attribute only (the private keys never expire).
@@ -326,14 +338,14 @@ gpg> 1y
 gpg> save
 ```
 
-Public keys have changed, so export and upload them (secret keys are kept
-unaltered!)
+Public keys have changed, so export and upload them (secret keys can leave
+untouched!)
 
 ```
 # all relevant exports
 gpg --armor --export-secret-keys --export-options export-backup $KEYID > full_backup.asc
 gpg --armor --export $KEYID > pubkey.asc
-gpg --export $KEYID > pubkey.gpg
+gpg --no-armor --export $KEYID > pubkey.gpg
 ```
 
 > [!NOTE]
