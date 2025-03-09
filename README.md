@@ -378,11 +378,14 @@ gpg --import pubkey.asc
 
 Confirm yubikey is genuine: https://www.yubico.com/genuine/
 
-Prepare yubikey
+Prepare yubikey (set PIN + Admin Pin but leave reset code disabled)
 
 ```
+# factory pin: 123456
+# factory admin pin: 12345678
 gpg --card-edit
 gpg/card> admin
+gpg/card> name
 gpg/card> kdf-setup
 gpg/card> passwd
 ```
@@ -436,7 +439,11 @@ gpg --card-status
 Enforce touch for GPG operations
 
 ```bash
+# on arch
 sudo pacman -S yubikey-manager
+sudo systemctl start pcscd.servicd
+# on tails
+sudo apt install yubikey-manager
 ```
 
 ```bash
