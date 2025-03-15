@@ -1,6 +1,7 @@
 # creation
 sudo dd if=/dev/urandom of=store.dat bs=1M count=25
-sudo cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -y luksFormat store.dat
+# default cipher+hash: aes-xts-plain64 512bit + argon2id
+sudo cryptsetup -y luksFormat store.dat
 sudo cryptsetup luksOpen store.dat backup
 sudo mkfs.ext4 /dev/mapper/backup
 sudo cryptsetup luksClose backup
