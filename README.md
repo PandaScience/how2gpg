@@ -24,13 +24,13 @@ Now just put this file on a safely-stored thumb drive.
 ### Mounting
 
 > [!TIP]
-> Do this in the secure live system (e.g. [tails](https://tails.net/index.de.html),
+> Do this in the secure live system (e.g. [Tails](https://tails.net/index.de.html),
 > see below).
 
 Mount encrypted file as non-root user
 
 ```
-udisksctl mount -b /dev/mmcblk0p1 backup
+udisksctl mount -b /dev/mmcblk0p1
 sudo cryptsetup luksOpen store.dat backup
 udisksctl mount -b /dev/mapper/backup
 
@@ -81,7 +81,7 @@ wget -O $GNUPGHOME/gpg.conf https://raw.githubusercontent.com/drduh/config/maste
 or copy existing one from backup drive to avoid early network connections.
 
 > [!IMPORTANT]
-> In the current version of DrDuh's config, the `armor` option is set, i.e. gpg
+> In the current version of Dr. Duh's config, the `armor` option is set, i.e. gpg
 > exports are not in binary format anymore by default. Keep in mind to add the
 > `--no-armor` flag when needed.
 
@@ -91,9 +91,9 @@ or copy existing one from backup drive to avoid early network connections.
 > (Arguably) best practice:
 >
 > - primary keys should never expire
-> - subkeys are valid for not longer than 1 year
+> - subkeys are valid for no longer than 1 year
 
-Parent key (pure ed25519 / cv25519)
+Parent key (ed25519, certify only)
 
 ```bash
 gpg --quick-generate-key 'Your Name <your.email@example.com>' ed25519 cert never
@@ -108,14 +108,14 @@ gpg --quick-add-key $KEYID cv25519 encr 1y
 gpg --quick-add-key $KEYID ed25519 auth 1y
 ```
 
-Add additional UIDS
+Add additional UIDs
 
 ```
 gpg --expert --edit-key $KEYID
 gpg> adduid
 ```
 
-Select UIDS and fully trust them (will not show correct "ultimate trust" until
+Select UIDs and fully trust them (will not show correct "ultimate trust" until
 all changes have been saved)
 
 ```
@@ -139,7 +139,7 @@ gpg> save
 gpg> quit
 ```
 
-Quality check (requires `openpgp-tools` package)
+Quality check (requires the `hopenpgp-tools` package)
 
 ```bash
 gpg --export $KEYID | hokey lint
@@ -171,7 +171,7 @@ gpg --armor --export-secret-subkeys $KEYID > subs.asc
 
 > [!TIP]
 > Use the `backup` option to export all necessary information to restore the
-> secrets keys (including local signatures) _but NOT_ the trust database entry,
+> secret keys (including local signatures) _but NOT_ the trust database entry,
 > check [docs](https://gnupg.org/documentation/manuals/gnupg/GPG-Input-and-Output.html).
 
 ```bash
@@ -204,7 +204,7 @@ gpg --armor --export $KEYID > pubkey.asc
 gpg --no-armor --export $KEYID > pubkey.gpg
 ```
 
-Revocation certificate (with optionally specified reason) in case key gets
+Revocation certificate (optionally with a reason) in case the key gets
 compromised (-> select 1)
 
 > [!NOTE]
@@ -226,7 +226,7 @@ Export trust database
 > Trust Level 5 (export: 6) = I trust ultimately <br>
 
 ```bash
-gpg --export-ownertrust > export/ownertrust.txt
+gpg --export-ownertrust > $GNUPGHOME/exports/ownertrust.txt
 ```
 
 Private keys are stored in `$GNUPGHOME/private-keys-v1.d/`, check with
@@ -316,7 +316,7 @@ gpg --edit-key $KEYID
 > (Arguably) best practice:
 >
 > - primary keys should never expire
-> - subkeys are valid for not longer than 1 year
+> - subkeys are valid for no longer than 1 year
 
 Primary key
 
@@ -338,8 +338,8 @@ gpg> 1y
 gpg> save
 ```
 
-Public keys have changed, so export and upload them (secret keys can leave
-untouched!)
+Public keys have changed, so export and upload them (secret keys can be
+left untouched!)
 
 ```
 # all relevant exports
@@ -356,7 +356,7 @@ gpg --no-armor --export $KEYID > pubkey.gpg
 > gpg --armor --export $KEYID > $KEYID-$(date +%F).asc
 > ```
 
-On each host import updated public key
+On each host, import the updated public key
 
 ```
 # from keyserver
@@ -373,10 +373,10 @@ gpg --import pubkey.asc
 
 > [!IMPORTANT]
 > You can safely enable KDF if you're planning to use the key on Android with
-> OpenKeyChain.<br>
+> OpenKeychain.<br>
 > See https://github.com/open-keychain/open-keychain/issues/2368.
 
-Confirm yubikey is genuine: https://www.yubico.com/genuine/
+Confirm the YubiKey is genuine: https://www.yubico.com/genuine/
 
 Prepare yubikey (set PIN + Admin Pin but leave reset code disabled)
 
@@ -421,7 +421,7 @@ Verify all subkeys start with `ssb>`
 gpg -K
 ```
 
-Add pubkey URL to yubikey
+Add pubkey URL to the YubiKey
 
 ```
 gpg --edit-card
@@ -430,7 +430,7 @@ gpg/card> url # https://keys.openpgp.org/vks/v1/by-fingerprint/<fingerprint>
 gpg/card> quit
 ```
 
-Remove and reinsert yubikey, then check its status
+Remove and reinsert the YubiKey, then check its status
 
 ```bash
 gpg --card-status
@@ -439,10 +439,10 @@ gpg --card-status
 Enforce touch for GPG operations
 
 ```bash
-# on arch
+# on Arch
 sudo pacman -S yubikey-manager
-sudo systemctl start pcscd.servicd
-# on tails
+sudo systemctl start pcscd.service
+# on Tails
 sudo apt install yubikey-manager
 ```
 
@@ -457,9 +457,9 @@ ykman openpgp keys set-touch enc on
 Basically follow the "Using keys" section in [Dr. Duh's
 guide](https://github.com/drduh/YubiKey-Guide?tab=readme-ov-file#using-keys).
 
-Assuming the pubkey URL field has been set in the yubikey.
+Assuming the pubkey URL field has been set in the YubiKey.
 
-Fetch public key and deploy subkey references pointing to yubikey
+Fetch the public key and deploy subkey references pointing to the YubiKey
 
 ```bash
 gpg --edit-card
@@ -477,12 +477,14 @@ gpg/card> quit
 
 ---
 
-Otherwise download the public keys from a keyserver or local computer,
+Otherwise download the public key from a keyserver or a local computer,
 import with
 
 ```bash
+# keyserver; selecting a key imports it
 gpg --search email.address@web.com
-gpg --import $KEYID
+# or from a file
+gpg --import pubkey.asc
 ```
 
 and then only run
@@ -507,7 +509,7 @@ gpg> trust (5)
 gpg> quit
 ```
 
-Yubikey and GPG keys should now show these symbols in front of the secret keys:
+The YubiKey and GPG keys should now show these symbols in front of the secret keys:
 
 ```bash
 gpg -K
@@ -528,16 +530,16 @@ After 3 failed attempts yubikey gets blocked. Unblock with
 ```
 # https://github.com/drduh/YubiKey-Guide/issues/168#issuecomment-1379532749
 gpg --edit-card
-admin
-passwd # select "2 - unblock PIN" and enter admin PIN
-gpg --card-status # verify "PIN retry counter" says again "3 0 3"
+gpg/card> admin
+gpg/card> passwd # select "2 - unblock PIN" and enter the admin PIN
+gpg --card-status # verify "PIN retry counter" says "3 0 3" again
 ```
 
 ### Android
 
 For use with the [Android Password Store](https://passwordstore.app/):
 
-1. Install [OpenKeyChain](https://www.openkeychain.org/)
+1. Install [OpenKeychain](https://www.openkeychain.org/)
 2. Remove Google Authenticator, it will block APS's NFC connection
 3. Generate SSH key in APS and add it as "deploy key" to the shared repo
 4. Add recipient to gopass
@@ -641,12 +643,12 @@ This will output a public key in SSH format that can be added to
 
 ## Misc
 
-### GoPass
+### gopass
 
-Make sure to add encryption subkey instead of primary and set
+Make sure to add the encryption subkey instead of the primary and set
 
 ```
-export $GOPASS_GPG_OPTS="--no-throw-keyids"
+export GOPASS_GPG_OPTS="--no-throw-keyids"
 ```
 
 in your shell.
