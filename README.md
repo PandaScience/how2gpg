@@ -378,16 +378,59 @@ gpg --import pubkey.asc
 
 Confirm the YubiKey is genuine: https://www.yubico.com/genuine/
 
-Prepare yubikey (set PIN + Admin Pin but leave reset code disabled)
+Five secrets live on two applets. The factory defaults reuse the same digits,
+and changing one does not change the others.
+
+**OpenPGP**, which GPG uses:
+
+- PIN unlocks the GPG subkeys for sign, decrypt, and authenticate. Factory
+  value: `123456`.
+- Admin PIN is only for managing that applet: importing keys and resetting the
+  user PIN. Factory value: `12345678`. Leave the reset code disabled.
+
+**PIV**, which age uses:
+
+- PIN unlocks PIV slot operations when a slot requires a PIN. Factory value:
+  `123456`. Same digits as the OpenPGP PIN, and a separate secret.
+- PUK only unblocks a blocked PIV PIN. Factory value: `12345678`. Same digits
+  as the OpenPGP admin PIN, and a separate secret.
+- Management key is the factory TDES key. It authorizes writing or erasing PIV
+  slots. `--protect` stores a new one on the YubiKey and unlocks it with the
+  PIV PIN, so you do not keep a second copy.
+
+Changing an OpenPGP PIN does not change the PIV secret that uses the same
+factory digits. Change the OpenPGP user PIN and admin PIN with `passwd`
+below, and change the PIV PIN, PUK, and management key separately.
+
+Install YubiKey Manager (also used below to require touch for GPG operations):
+
+```bash
+# on Arch
+sudo pacman -S yubikey-manager
+sudo systemctl start pcscd.service
+# on Tails
+sudo apt install yubikey-manager
+```
+
+Prepare the OpenPGP applet:
 
 ```
-# factory pin: 123456
-# factory admin pin: 12345678
+# factory PIN: 123456
+# factory admin PIN: 12345678
 gpg --card-edit
 gpg/card> admin
 gpg/card> name
 gpg/card> kdf-setup
 gpg/card> passwd
+```
+
+Change the PIV PIN before the management key, so `--protect` wraps the new key
+with that PIN:
+
+```bash
+ykman piv access change-pin
+ykman piv access change-puk
+ykman piv access change-management-key --generate --protect
 ```
 
 Transfer keys
@@ -437,14 +480,6 @@ gpg --card-status
 ```
 
 Enforce touch for GPG operations
-
-```bash
-# on Arch
-sudo pacman -S yubikey-manager
-sudo systemctl start pcscd.service
-# on Tails
-sudo apt install yubikey-manager
-```
 
 ```bash
 ykman openpgp keys set-touch aut on
@@ -525,7 +560,8 @@ ssb> cv25519/0xAABBCCDDEEFF0044
 
 ### Unblock PIN
 
-After 3 failed attempts yubikey gets blocked. Unblock with
+After 3 failed attempts the OpenPGP user PIN is blocked. Unblock it with the
+admin PIN:
 
 ```
 # https://github.com/drduh/YubiKey-Guide/issues/168#issuecomment-1379532749
@@ -533,6 +569,12 @@ gpg --edit-card
 gpg/card> admin
 gpg/card> passwd # select "2 - unblock PIN" and enter the admin PIN
 gpg --card-status # verify "PIN retry counter" says "3 0 3" again
+```
+
+A blocked PIV PIN is a separate counter. Unblock it with the PIV PUK:
+
+```bash
+ykman piv access unblock-pin
 ```
 
 ### Android
