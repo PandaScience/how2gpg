@@ -420,14 +420,33 @@ Changing an OpenPGP PIN does not change the PIV secret that uses the same
 factory digits. Change the OpenPGP user PIN and admin PIN with `passwd`
 below, and change the PIV PIN, PUK, and management key separately.
 
-Install YubiKey Manager (used below for touch policy and the PIV secrets):
+Do this once, on one machine. `ykman` only changes settings stored on the key
+(PINs, touch policy, PIV slots). Later machines do not need it for GPG or SSH.
 
 ```bash
-# on Arch; age-plugin-yubikey pulls in age
+# on Arch; age-plugin-yubikey pulls in age. yubikey-manager pulls in ccid.
 sudo pacman -S yubikey-manager age-plugin-yubikey
 sudo systemctl start pcscd.service
 # on Tails
 sudo apt install yubikey-manager
+```
+
+`ccid` lets `pcscd` claim the USB interface. `scdaemon` then logs
+`ccid open error: skip` and `gpg --card-status` reports no card, while
+`ykman list` still works. While `ccid` is installed, make `scdaemon` use
+PC/SC:
+
+```
+# ~/.gnupg/scdaemon.conf
+# The ccid package lets pcscd own the YubiKey USB device. scdaemon's built-in
+# driver then fails and gpg sees no card. This sends scdaemon through pcscd
+# as well, which is the only path age-plugin-yubikey and ykman can use.
+# Remove this line if the ccid package is not installed.
+disable-ccid
+```
+
+```bash
+gpgconf --kill scdaemon
 ```
 
 Prepare the OpenPGP applet:
@@ -506,10 +525,63 @@ ykman openpgp keys set-touch sig on
 ykman openpgp keys set-touch enc on
 ```
 
+Touch policy and PINs stay on the YubiKey. Reinstall `yubikey-manager` only
+to change them, or to unblock a PIV PIN.
+
+### On another machine
+
+GPG and SSH need only `gnupg`. `gpg-agent` starts `scdaemon`, and `scdaemon`
+opens the YubiKey with its own USB driver. `ykman` is not on that path.
+
+`age-plugin-yubikey` cannot use `scdaemon`. It only speaks PC/SC
+(`libpcsclite`). `pcscd` still needs a reader driver before a YubiKey shows
+up. That driver is the `ccid` package. The plugin does not declare a
+dependency on it: the binary links the PC/SC library, and `pcscd` loads
+reader drivers separately. Upstream cannot depend on Arch's `ccid` package,
+and not every PC/SC reader is a CCID YubiKey. On a YubiKey, install the
+driver yourself, or keep `yubikey-manager`, which pulls `ccid` in:
+
+```bash
+sudo pacman -S ccid
+```
+
+`pcscd` and `scdaemon` both want the same USB device. With `ccid` installed,
+`pcscd` takes it and `gpg --card-status` reports no card until `scdaemon` is
+sent through `pcscd` as well. Keep this for as long as `ccid` is installed:
+
+```
+# ~/.gnupg/scdaemon.conf
+# The ccid package lets pcscd own the YubiKey USB device. scdaemon's built-in
+# driver then fails and gpg sees no card. This sends scdaemon through pcscd
+# as well, which is the only path age-plugin-yubikey and ykman can use.
+# Remove this line if the ccid package is not installed.
+disable-ccid
+```
+
+```bash
+gpgconf --kill scdaemon
+```
+
+For GPG only, remove the driver and that switch. `scdaemon` then uses its own
+driver again. The age plugin can stay installed, but it will not see the key
+until `ccid` is installed once more:
+
+```bash
+sudo pacman -Rns yubikey-manager ccid
+gpgconf --kill scdaemon
+sudo systemctl stop pcscd.service
+gpg --card-status
+```
+
+`pacman -Rns` drops `ccid` only when no other package still requires it. If
+`pacman -Qi ccid` shows another required-by, leave `ccid` and `disable-ccid`
+in place.
+
 ## New Host
 
 Basically follow the "Using keys" section in [Dr. Duh's
 guide](https://github.com/drduh/YubiKey-Guide?tab=readme-ov-file#using-keys).
+Pick the card driver as in [On another machine](#on-another-machine).
 
 Assuming the pubkey URL field has been set in the YubiKey.
 
