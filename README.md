@@ -388,7 +388,25 @@ and changing one does not change the others.
 - Admin PIN is only for managing that applet: importing keys and resetting the
   user PIN. Factory value: `12345678`. Leave the reset code disabled.
 
-**PIV**, which age uses:
+**PIV** holds X.509 keys. GPG and SSH do not use it. Sign, encrypt, SSH login,
+and SSH-format Git signatures stay on the OpenPGP subkeys, with the
+authentication subkey offered through `gpg-agent`.
+
+[`age`](https://github.com/FiloSottile/age) encrypts a file to a recipient and
+decrypts it with the matching identity. It has no built-in YubiKey support.
+`age-plugin-yubikey` is the program `age` runs when a recipient starts with
+`age1yubikey`. The plugin stores that identity in one retired PIV slot
+(82–95), so the private key never leaves the YubiKey. Decrypting prompts for
+the PIV PIN and touch according to the policy set when the slot was written.
+The identity file the plugin writes only names the key. It does not contain
+the secret, and it is useless without that YubiKey.
+
+Use it when a secret should unlock only while the YubiKey is present, instead
+of from an age private key sitting on disk. One case is secrets in the NixOS
+config: the file is encrypted to the YubiKey recipient, and decryption happens
+when the key is plugged in. Add a normal age identity as a second recipient
+when the same file must also open without the YubiKey. Skip the PIV PIN, PUK,
+and management key steps when you are not creating this identity.
 
 - PIN unlocks PIV slot operations when a slot requires a PIN. Factory value:
   `123456`. Same digits as the OpenPGP PIN, and a separate secret.
@@ -402,11 +420,11 @@ Changing an OpenPGP PIN does not change the PIV secret that uses the same
 factory digits. Change the OpenPGP user PIN and admin PIN with `passwd`
 below, and change the PIV PIN, PUK, and management key separately.
 
-Install YubiKey Manager (also used below to require touch for GPG operations):
+Install YubiKey Manager (used below for touch policy and the PIV secrets):
 
 ```bash
-# on Arch
-sudo pacman -S yubikey-manager
+# on Arch; age-plugin-yubikey pulls in age
+sudo pacman -S yubikey-manager age-plugin-yubikey
 sudo systemctl start pcscd.service
 # on Tails
 sudo apt install yubikey-manager
@@ -431,6 +449,7 @@ with that PIN:
 ykman piv access change-pin
 ykman piv access change-puk
 ykman piv access change-management-key --generate --protect
+age-plugin-yubikey --generate --pin-policy once --touch-policy cached
 ```
 
 Transfer keys
